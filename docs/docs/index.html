@@ -1,1 +1,182 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An exploratory study of content-review prioritization using historical search performance signals.">
+<title>Prioritizing Content for Review | ML Capstone</title>
+<style>
+:root{--ink:#182230;--muted:#586779;--line:#dce3eb;--accent:#2457c5;--bg:#f5f7fb;--card:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:#13233f;color:#fff;padding:64px 22px}
+.hero,main,footer{max-width:1000px;margin:auto}
+.eyebrow{text-transform:uppercase;letter-spacing:.13em;font-size:.78rem;font-weight:700;color:#9fc2ff}
+h1{font-size:clamp(2.1rem,5vw,3.7rem);line-height:1.12;max-width:800px;margin:14px 0}
+header p{max-width:720px;color:#d9e4f5;font-size:1.08rem}
+main{padding:28px 18px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:26px;margin:20px 0;scroll-margin-top:20px}
+h2{font-size:1.5rem;line-height:1.3;margin-top:0}
+h3{font-size:1.08rem;margin-bottom:8px}
+p,li{color:#344255}
+.muted,small{color:var(--muted)}
+nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+nav a,.pill{font-size:.88rem;padding:6px 11px;border:1px solid #536783;border-radius:30px;color:#fff;text-decoration:none}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:20px 0}
+.metric{border:1px solid var(--line);border-radius:12px;padding:16px;background:#fbfcff}
+.metric strong{display:block;font-size:1.7rem;line-height:1.3;color:var(--accent)}
+.metric span{font-size:.88rem;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:.94rem}
+th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line)}
+th{background:#f1f5fa}
+.table-wrap{overflow-x:auto}
+.callout{border-left:4px solid var(--accent);padding:12px 16px;background:#f0f5ff;border-radius:0 8px 8px 0}
+.bar-row{display:grid;grid-template-columns:100px 1fr 62px;gap:10px;align-items:center;margin:15px 0}
+.bar-track{height:15px;background:#e8edf5;border-radius:20px;overflow:hidden}
+.bar{height:100%;background:var(--accent);border-radius:20px}
+footer{padding:0 20px 40px;color:var(--muted);font-size:.92rem}
+a{color:var(--accent)}
+@media(max-width:560px){section{padding:19px}header{padding:42px 20px}.bar-row{grid-template-columns:82px 1fr 55px;font-size:.88rem}th,td{padding:9px 7px}}
+</style>
+</head>
+<body>
+<header>
+<div class="hero">
+<div class="eyebrow">Machine Learning Capstone · Research Report</div>
+<h1>Prioritizing Content Pages for Human Review</h1>
+<p>Can historical search-performance signals help teams identify pages that may deserve closer review?</p>
+<p><span class="pill">Exploratory analysis</span> <span class="pill">Leakage-aware evaluation</span> <span class="pill">Human-in-the-loop</span></p>
+<nav aria-label="Report sections">
+<a href="#abstract">Abstract</a><a href="#introduction">Introduction</a><a href="#data">Data</a><a href="#methodology">Methodology</a><a href="#results">Results</a><a href="#limitations">Limitations</a><a href="#recommendations">Recommendations</a><a href="#reproducibility">Reproducibility</a>
+</nav>
+</div>
+</header>
+
+<main>
+<section id="abstract">
+<h2>0. Abstract</h2>
+<p>This study explores whether historical search-performance signals can help prioritize content pages for human review. An anonymized dataset containing 30,000 records and 44 columns was examined using a transparent baseline ranking and a logistic-regression model. The exploratory target was derived from an existing trend-direction field, and evaluation used a client-grouped train/test split to reduce client overlap between the two sets. The model achieved average precision of 0.5790 and precision@20 of 0.85 on the held-out split, compared with 0.5124 and 0.35 for the baseline. These results show a difference in ranking performance against the available proxy label, not proof of future decline or evidence that updating a page will improve its performance.</p>
+<div class="callout"><strong>Decision:</strong> Use the ranking as a starting point for human review—not as an automatic content-update or removal system.</div>
+</section>
+
+<section id="introduction">
+<h2>1. Introduction and Problem</h2>
+<p>Content teams may have more pages to review than they can investigate at once. A useful prioritization method should help reviewers decide where to look first while remaining understandable and reproducible.</p>
+<p>This project asks whether historical search signals can help order pages for review. It compares a simple scoring baseline with a machine-learning approach and documents the limitations of using a trend-derived proxy target.</p>
+<h3>Objective</h3>
+<ul>
+<li>Build a transparent baseline for ranking review candidates.</li>
+<li>Compare the baseline with logistic regression using a client-grouped holdout.</li>
+<li>Translate the results into cautious, human-reviewed recommendations.</li>
+</ul>
+</section>
+
+<section id="data">
+<h2>2. Data and Quality Checks</h2>
+<div class="metrics">
+<div class="metric"><strong>30,000</strong><span>Records</span></div>
+<div class="metric"><strong>44</strong><span>Columns</span></div>
+<div class="metric"><strong>32</strong><span>Distinct clients</span></div>
+<div class="metric"><strong>0</strong><span>Duplicate rows reported</span></div>
+</div>
+<p>The analysis used an anonymized content-performance dataset. Client names, domains, private search queries, and raw exports are intentionally not published here.</p>
+<ul>
+<li>The proxy target was defined as <code>trend_direction == "down"</code>; it was not a separately verified future-outcome label.</li>
+<li><code>avg_position = 0</code> occurred in 1,205 rows and was treated as a missing/no-data signal rather than a true rank of zero.</li>
+<li>Word-count missingness varied by content type. Missing values were not interpreted as evidence that a page had thin content.</li>
+<li>Identifier fields were reserved for joins, grouping, splitting, and deterministic tie-breaking—not used as predictive features.</li>
+<li>The warehouse's June 2026 final-test period was designated as sealed and was not used to develop or tune this proxy-label experiment.</li>
+</ul>
+</section>
+
+<section id="methodology">
+<h2>3. Methodology</h2>
+<h3>Baseline: ML-07</h3>
+<p>A transparent additive score used available historical signals such as 90-day impressions, click-through rate, content age, time since last update, and word-count availability. The ranking was ordered by score, then impressions, then content identifier as a deterministic tie-breaker.</p>
+<h3>Model: ML-08</h3>
+<p>Logistic regression was evaluated against the proxy target. A client-grouped train/test split used random state 42. The training set contained 23,837 records across 25 clients; the test set contained 6,163 records across 7 different clients, with no client overlap.</p>
+<h3>Evaluation</h3>
+<p>Average precision (AP) and ROC-AUC summarize ranking/discrimination behavior. Precision@20 measures the share of the top 20 ranked records matching the proxy label. Metrics describe this particular split and label definition only.</p>
+<div class="callout"><strong>Important:</strong> A client-grouped split reduces one form of leakage, but does not establish prospective forecasting performance or causal impact.</div>
+</section>
+
+<section id="results">
+<h2>4. Results</h2>
+<p class="muted">Exploratory evaluation against the trend-derived proxy label on the client-grouped test split.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Metric</th><th>Baseline ML-07</th><th>Logistic regression ML-08</th></tr></thead>
+<tbody>
+<tr><td>Average precision (AP)</td><td>0.5124</td><td>0.5790</td></tr>
+<tr><td>ROC-AUC</td><td>0.5048</td><td>0.5841</td></tr>
+<tr><td>Precision@20</td><td>0.35</td><td>0.85</td></tr>
+</tbody>
+</table>
+</div>
+<h3>Average precision</h3>
+<div class="bar-row"><span>Baseline</span><div class="bar-track"><div class="bar" style="width:51.24%"></div></div><strong>0.5124</strong></div>
+<div class="bar-row"><span>Model</span><div class="bar-track"><div class="bar" style="width:57.9%"></div></div><strong>0.5790</strong></div>
+<h3>ROC-AUC</h3>
+<div class="bar-row"><span>Baseline</span><div class="bar-track"><div class="bar" style="width:50.48%"></div></div><strong>0.5048</strong></div>
+<div class="bar-row"><span>Model</span><div class="bar-track"><div class="bar" style="width:58.41%"></div></div><strong>0.5841</strong></div>
+<p class="muted">Bars show metric values on a 0–1 scale. They are not estimates of business impact.</p>
+<h3>Classification errors at the recorded threshold</h3>
+<div class="metrics">
+<div class="metric"><strong>1,621</strong><span>False positives</span></div>
+<div class="metric"><strong>1,057</strong><span>False negatives</span></div>
+<div class="metric"><strong>3,485</strong><span>Correct classifications</span></div>
+</div>
+<p>The test set's recorded positive rate was 0.511. Its content-type coverage was limited to keyword articles, so these metrics should not be generalized to other content types. The higher precision@20 is promising for this split but requires further validation.</p>
+</section>
+
+<section id="limitations">
+<h2>5. Limitations</h2>
+<ul>
+<li><strong>Proxy label:</strong> The target reflects an existing trend-direction field, not an independently measured future outcome.</li>
+<li><strong>No causal conclusion:</strong> The analysis cannot show that refreshing a page causes search performance to improve.</li>
+<li><strong>Limited generalization:</strong> The held-out split included keyword articles only.</li>
+<li><strong>Missing data:</strong> Missing word counts and other availability patterns may influence scores and model behavior.</li>
+<li><strong>Potential confounding:</strong> Associations may reflect content type, measurement coverage, or other factors rather than an actionable cause.</li>
+<li><strong>Exploratory evaluation:</strong> These recorded metrics do not replace a prospective time-based evaluation or a sealed final test.</li>
+<li><strong>Human review required:</strong> A high score is a review signal, not a verdict that a page is poor or should be changed.</li>
+</ul>
+</section>
+
+<section id="recommendations">
+<h2>6. Ranked Recommendations</h2>
+<ol>
+<li><strong>Review high-priority pages manually.</strong> Check intent match, content accuracy, usefulness, and search-result context before taking action.</li>
+<li><strong>Audit missing measurements.</strong> Investigate missing word counts and zero-position values before interpreting them as content problems.</li>
+<li><strong>Use CTR as a diagnostic signal, not a standalone rule.</strong> Review impressions, query intent, and result appearance together.</li>
+<li><strong>Consider age and update recency in context.</strong> Old content is not automatically outdated; verify whether facts, links, or guidance need attention.</li>
+<li><strong>Validate across content types.</strong> Test on suitable held-out examples from comparison and other content categories before broader use.</li>
+<li><strong>Run a prospective evaluation.</strong> Freeze the scoring method, evaluate on a genuinely later period, and track outcomes before claiming forecasting value.</li>
+<li><strong>Keep people in control.</strong> Record reviewer decisions and reasons, then use them to improve future evaluation responsibly.</li>
+</ol>
+</section>
+
+<section id="reproducibility">
+<h2>7. Reproducibility</h2>
+<p>The accompanying repository contains the capstone notebook and project documentation. The reported numbers above are the recorded results from the exploratory notebook analysis.</p>
+<ul>
+<li>Notebook: <a href="https://github.com/vishalseries7030/flyrank-ml-internship/blob/main/work/notebooks/capstone.ipynb">Open capstone notebook</a>.</li>
+<li>Data dictionary: <a href="https://github.com/vishalseries7030/flyrank-ml-internship/blob/main/docs/data-dictionary.md">Open data dictionary</a>.</li>
+<li>Repository: <a href="https://github.com/vishalseries7030/flyrank-ml-internship">View source repository</a>.</li>
+</ul>
+<p>To reproduce the work, use the documented environment and approved anonymized data access, then execute notebook cells in order. Do not commit raw exports, credentials, private queries, or generated record-level CSV files. Recompute metrics from the notebook rather than treating this web page as executable evidence.</p>
+</section>
+
+<section id="acknowledgments">
+<h2>8. Acknowledgments and Data Credit</h2>
+<p>This project was completed as part of the FlyRank ML internship capstone using the provided anonymized content-performance dataset and project guidance.</p>
+<p>Organization: <a href="https://flyrank.ai" rel="noopener noreferrer">FlyRank</a>.</p>
+<p class="muted">This is an exploratory educational analysis. Results are limited to the dataset, proxy label, split, and methods described above.</p>
+</section>
+</main>
+<footer>
+<p>Research report · Built as a static, accessible HTML page · No raw dataset or client-level records are embedded in this page.</p>
+</footer>
+</body>
+</html>
+
